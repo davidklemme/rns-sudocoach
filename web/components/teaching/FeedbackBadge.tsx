@@ -46,10 +46,10 @@ export default function FeedbackBadge() {
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed bottom-4 right-4 z-50"
-        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+        className="fixed top-20 right-4 z-50"
+        initial={{ opacity: 0, y: -20, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20, scale: 0.9 }}
+        exit={{ opacity: 0, y: -20, scale: 0.9 }}
         transition={{ duration: 0.3 }}
       >
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700 overflow-hidden max-w-sm">
