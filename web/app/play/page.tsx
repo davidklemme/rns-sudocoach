@@ -165,7 +165,7 @@ export default function Play() {
           </h1>
           <div className="flex items-center gap-2 text-sm">
             {/* Stats inline with header */}
-            <span className="hidden xl:flex items-center gap-3 mr-4 text-xs">
+            <span className="hidden lg:flex items-center gap-3 mr-4 text-xs">
               <span>⏱️ {elapsedTime}</span>
               <span>💡 {hintsUsed}</span>
               <span>❌ {mistakes}</span>
@@ -193,8 +193,8 @@ export default function Play() {
           </div>
         </div>
 
-        {/* DESKTOP LAYOUT (xl): Grid 50% | NumPad 80% + Options 20% */}
-        <div className="hidden xl:flex flex-1 gap-6 min-h-0">
+        {/* DESKTOP LAYOUT (lg+): Grid 50% | NumPad 80% + Options 20% */}
+        <div className="hidden lg:flex flex-1 gap-6 min-h-0">
           {/* Left: Board (50%) */}
           <div className="w-1/2 flex items-center justify-center">
             <div className="w-full h-full max-w-[500px] max-h-[500px] aspect-square">
@@ -237,8 +237,8 @@ export default function Play() {
           </div>
         </div>
 
-        {/* TABLET LAYOUT (md-xl): Stacked but wider */}
-        <div className="hidden md:flex xl:hidden flex-col flex-1 gap-3 overflow-y-auto">
+        {/* TABLET LAYOUT (md-lg): Stacked but wider */}
+        <div className="hidden md:flex lg:hidden flex-col flex-1 gap-3 overflow-y-auto">
           {/* Stats Row */}
           <div className="flex justify-center gap-6 text-sm bg-white dark:bg-gray-800 rounded-lg p-2 shadow">
             <span>⏱️ {elapsedTime}</span>
