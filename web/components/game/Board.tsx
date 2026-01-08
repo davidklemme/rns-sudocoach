@@ -12,6 +12,7 @@ export default function Board() {
     errorCells,
     pencilMarks,
     gridSize,
+    hintCell,
   } = useGameStore()
 
   if (!currentGrid || !initialGrid) {
@@ -48,6 +49,7 @@ export default function Board() {
             const isHighlighted = highlightedCells.has(key) && !isSelected
             const isError = errorCells.has(key)
             const marks = pencilMarks.get(key)
+            const isHint = hintCell?.row === rowIndex && hintCell?.col === colIndex
 
             return (
               <Cell
@@ -59,6 +61,7 @@ export default function Board() {
                 isSelected={isSelected}
                 isHighlighted={isHighlighted}
                 isError={isError}
+                isHint={isHint}
                 pencilMarks={marks}
                 gridSize={gridSize}
               />

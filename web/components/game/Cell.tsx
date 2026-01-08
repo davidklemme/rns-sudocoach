@@ -11,6 +11,7 @@ interface CellProps {
   isSelected: boolean
   isHighlighted: boolean
   isError: boolean
+  isHint?: boolean
   pencilMarks?: Set<number>
   gridSize: number
 }
@@ -23,15 +24,16 @@ export default function Cell({
   isSelected,
   isHighlighted,
   isError,
+  isHint,
   pencilMarks,
   gridSize,
 }: CellProps) {
   const selectCell = useGameStore((state) => state.selectCell)
 
   const handleClick = () => {
-    if (!isInitial) {
-      selectCell(row, col)
-    }
+    // Allow selecting any cell for navigation/viewing
+    // The makeMove function will prevent modifying initial cells
+    selectCell(row, col)
   }
 
   const boxRows = gridSize === 4 ? 2 : gridSize === 6 ? 2 : 3
@@ -42,6 +44,14 @@ export default function Cell({
   const isBottomBoxBoundary = row === gridSize - 1 || (row + 1) % boxRows === 0
   const isRightBoxBoundary = col === gridSize - 1 || (col + 1) % boxCols === 0
 
+  // Determine background color
+  const getBackgroundColor = () => {
+    if (isHint) return '#fbbf24' // Bright yellow/gold for hints
+    if (isSelected) return '#93c5fd' // Blue for selected
+    if (isHighlighted) return '#dbeafe' // Light blue for highlighted
+    return '#ffffff' // White for normal
+  }
+
   return (
     <motion.button
       style={{
@@ -49,7 +59,7 @@ export default function Cell({
         borderLeft: isLeftBoxBoundary ? '3px solid #000' : '1px solid #999',
         borderBottom: isBottomBoxBoundary ? '3px solid #000' : '1px solid #999',
         borderRight: isRightBoxBoundary ? '3px solid #000' : '1px solid #999',
-        backgroundColor: isSelected ? '#93c5fd' : isHighlighted ? '#dbeafe' : '#ffffff',
+        backgroundColor: getBackgroundColor(),
       }}
       className={`
         aspect-square flex items-center justify-center
@@ -58,8 +68,18 @@ export default function Cell({
         relative
       `}
       onClick={handleClick}
-      animate={isError ? { x: [-4, 4, -4, 4, 0] } : {}}
-      transition={{ duration: 0.3 }}
+      animate={
+        isError
+          ? { x: [-4, 4, -4, 4, 0] }
+          : isHint
+            ? { scale: [1, 1.05, 1], backgroundColor: ['#fbbf24', '#fcd34d', '#fbbf24'] }
+            : {}
+      }
+      transition={
+        isHint
+          ? { duration: 1.5, repeat: Infinity, ease: 'easeInOut' }
+          : { duration: 0.3 }
+      }
       whileTap={!isInitial ? { scale: 0.92 } : {}}
     >
       {value ? (

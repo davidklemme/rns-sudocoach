@@ -4,10 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { useGameStore } from '@/store/gameStore'
 import Board from '@/components/game/Board'
 import NumberPad from '@/components/game/NumberPad'
-import Controls from '@/components/game/Controls'
 import FeedbackBadge from '@/components/teaching/FeedbackBadge'
-import StrategyStats from '@/components/teaching/StrategyStats'
-import Link from 'next/link'
+import HintDisplay from '@/components/teaching/HintDisplay'
 
 export default function Play() {
   const {
@@ -81,46 +79,21 @@ export default function Play() {
     }
   }, [selectedCell])
 
+  // Get addPencilMark for direct pencil mark handling
+  const addPencilMark = useGameStore((state) => state.addPencilMark)
+
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Number keys 1-9 (using e.code to handle Shift properly)
+      // Number keys 1-9
       const digitMatch = e.code.match(/^Digit(\d)$/)
       if (digitMatch) {
         const num = parseInt(digitMatch[1])
         if (num >= 1 && num <= gridSize) {
-          // If Shift is held, temporarily enable pencil mode
-          if (e.shiftKey && !isPencilMode) {
-            togglePencilMode()
-            makeMove(num)
-            // Toggle back after a brief delay
-            setTimeout(() => togglePencilMode(), 50)
-          } else if (!e.shiftKey && isPencilMode) {
-            // If not holding shift but in pencil mode, disable it temporarily
-            togglePencilMode()
-            makeMove(num)
-            setTimeout(() => togglePencilMode(), 50)
-          } else {
-            // Normal behavior
-            makeMove(num)
-          }
-          // Clear mobile input after move
-          if (mobileInputRef.current) {
-            mobileInputRef.current.value = ''
-          }
-        }
-        return
-      }
-
-      // Also handle regular number keys without shift
-      if (e.key >= '1' && e.key <= '9' && !e.shiftKey) {
-        const num = parseInt(e.key)
-        if (num <= gridSize) {
-          if (isPencilMode) {
-            // If in pencil mode, disable it temporarily
-            togglePencilMode()
-            makeMove(num)
-            setTimeout(() => togglePencilMode(), 50)
+          // Shift+Number = always pencil mark (toggle the mark)
+          // Number alone = always normal entry
+          if (e.shiftKey) {
+            addPencilMark(num)
           } else {
             makeMove(num)
           }
@@ -176,7 +149,7 @@ export default function Play() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCell, currentGrid, gridSize, makeMove, selectCell, clearCell, isPencilMode, togglePencilMode])
+  }, [selectedCell, currentGrid, gridSize, makeMove, selectCell, clearCell, addPencilMark])
 
   const handleNewGame = (size: typeof gridSize, diff: typeof difficulty) => {
     startNewGame(size, diff, Date.now())
@@ -215,94 +188,83 @@ export default function Play() {
         </div>
 
         {/* Layout: Responsive - vertical on mobile, horizontal on desktop */}
-        <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
-          {/* Left side: Board + Number Pad */}
-          <div className="flex-1 flex flex-col gap-4 min-w-0 items-center justify-center">
-            {/* Board */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+        <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden">
+          {/* Left side: Board only on desktop */}
+          <div className="flex-1 flex items-center justify-center min-w-0">
+            <div className="w-full h-full max-w-[600px] max-h-[600px] aspect-square">
               <Board />
-            </div>
-
-            {/* Mobile keyboard hint - shown only on mobile */}
-            <div className="block sm:hidden bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 rounded-xl p-4 text-center shadow-lg" style={{ width: '100%', maxWidth: '28rem' }}>
-              <div className="text-2xl mb-2">⌨️</div>
-              <div className="text-sm font-bold text-purple-700 dark:text-purple-300">
-                Tap a cell, then use your keyboard!
-              </div>
-            </div>
-
-            {/* Number Pad - Centered below board, hidden on very small screens */}
-            <div className="hidden sm:block bg-white dark:bg-gray-800 rounded-xl shadow-lg" style={{ padding: '24px', width: '100%', maxWidth: '28rem' }}>
-              <NumberPad />
             </div>
           </div>
 
-          {/* Right side: Options - Full width on mobile, fixed width on desktop */}
-          <div className="w-full lg:w-96 flex flex-col gap-4 flex-shrink-0 lg:pr-6">
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center shadow-lg">
-                <div className="text-3xl mb-1">⏱️</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Time</div>
-                <div className="text-2xl font-bold">{elapsedTime}</div>
+          {/* Right side: All controls on desktop - narrower width */}
+          <div className="w-full lg:w-56 flex flex-col gap-2 flex-shrink-0 overflow-y-auto">
+            {/* Stats - Compact */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center shadow">
+                <div className="text-lg">⏱️</div>
+                <div className="text-xs text-gray-500">Time</div>
+                <div className="text-sm font-bold">{elapsedTime}</div>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center shadow-lg">
-                <div className="text-3xl mb-1">💡</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Hints</div>
-                <div className="text-2xl font-bold">{hintsUsed}</div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center shadow">
+                <div className="text-lg">💡</div>
+                <div className="text-xs text-gray-500">Hints</div>
+                <div className="text-sm font-bold">{hintsUsed}</div>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center shadow-lg">
-                <div className="text-3xl mb-1">❌</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Errors</div>
-                <div className="text-2xl font-bold">{mistakes}</div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center shadow">
+                <div className="text-lg">❌</div>
+                <div className="text-xs text-gray-500">Errors</div>
+                <div className="text-sm font-bold">{mistakes}</div>
               </div>
             </div>
 
             {/* Controls */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '12px' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-lg">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '6px' }}>
                 <button
                   onClick={undo}
                   disabled={historyIndex < 0}
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     backgroundColor: historyIndex < 0 ? '#d1d5db' : '#a855f7',
                     color: 'white',
-                    fontWeight: 'bold',
+                    fontWeight: '600',
+                    fontSize: '12px',
                     transition: 'all 0.15s',
                     border: 'none',
                     cursor: historyIndex < 0 ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  ⏪ Go Back
+                  ⏪ Undo
                 </button>
                 <button
                   onClick={redo}
                   disabled={historyIndex >= moveHistory.length - 1}
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     backgroundColor: historyIndex >= moveHistory.length - 1 ? '#d1d5db' : '#a855f7',
                     color: 'white',
-                    fontWeight: 'bold',
+                    fontWeight: '600',
+                    fontSize: '12px',
                     transition: 'all 0.15s',
                     border: 'none',
                     cursor: historyIndex >= moveHistory.length - 1 ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  ⏩ Go Forward
+                  ⏩ Redo
                 </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '6px' }}>
                 <button
                   onClick={clearCell}
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     backgroundColor: '#ef4444',
                     color: 'white',
-                    fontWeight: 'bold',
+                    fontWeight: '600',
+                    fontSize: '12px',
                     transition: 'all 0.15s',
                     border: 'none',
                     cursor: 'pointer',
@@ -313,11 +275,12 @@ export default function Play() {
                 <button
                   onClick={togglePencilMode}
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     backgroundColor: isPencilMode ? '#f97316' : '#e5e7eb',
                     color: isPencilMode ? 'white' : '#111827',
-                    fontWeight: 'bold',
+                    fontWeight: '600',
+                    fontSize: '12px',
                     transition: 'all 0.15s',
                     border: 'none',
                     cursor: 'pointer',
@@ -329,48 +292,50 @@ export default function Play() {
                   onClick={useHint}
                   disabled={isComplete}
                   style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
                     backgroundColor: isComplete ? '#d1d5db' : '#eab308',
                     color: 'white',
-                    fontWeight: 'bold',
+                    fontWeight: '600',
+                    fontSize: '12px',
                     transition: 'all 0.15s',
                     border: 'none',
                     cursor: isComplete ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  💡 Help
+                  💡 Hint
                 </button>
               </div>
               <button
                 onClick={resetGame}
                 style={{
                   width: '100%',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
+                  padding: '6px 8px',
+                  borderRadius: '6px',
                   backgroundColor: '#e5e7eb',
                   color: '#111827',
                   fontWeight: '500',
+                  fontSize: '12px',
                   transition: 'all 0.15s',
                   border: 'none',
                   cursor: 'pointer',
                 }}
               >
-                🔄 Start Over
+                🔄 Reset
               </button>
             </div>
 
             {/* Helper Lights */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg">
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '12px' }}>✨ Helper Lights</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-lg">
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>✨ Helper Lights</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                 <button
                   onClick={toggleRowHighlight}
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '600',
                     transition: 'all 0.15s',
                     backgroundColor: showRowHighlight ? '#3b82f6' : '#e5e7eb',
                     color: showRowHighlight ? 'white' : '#111827',
@@ -383,10 +348,10 @@ export default function Play() {
                 <button
                   onClick={toggleColumnHighlight}
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '600',
                     transition: 'all 0.15s',
                     backgroundColor: showColumnHighlight ? '#3b82f6' : '#e5e7eb',
                     color: showColumnHighlight ? 'white' : '#111827',
@@ -399,10 +364,10 @@ export default function Play() {
                 <button
                   onClick={toggleBoxHighlight}
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '600',
                     transition: 'all 0.15s',
                     backgroundColor: showBoxHighlight ? '#3b82f6' : '#e5e7eb',
                     color: showBoxHighlight ? 'white' : '#111827',
@@ -416,17 +381,17 @@ export default function Play() {
             </div>
 
             {/* Fun Settings */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-lg">
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '12px' }}>🎨 Fun Settings</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-lg">
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>🎨 Settings</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <button
                   onClick={toggleErrorFeedback}
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '600',
                     transition: 'all 0.15s',
                     backgroundColor: showErrorFeedback ? '#ef4444' : '#e5e7eb',
                     color: showErrorFeedback ? 'white' : '#111827',
@@ -434,16 +399,16 @@ export default function Play() {
                     cursor: 'pointer',
                   }}
                 >
-                  {showErrorFeedback ? '🔴 Oops Flash: ON' : '🔴 Oops Flash: OFF'}
+                  {showErrorFeedback ? '🔴 Error Flash: ON' : '🔴 Error Flash: OFF'}
                 </button>
                 <button
                   onClick={toggleAutoCleanPencilMarks}
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '600',
                     transition: 'all 0.15s',
                     backgroundColor: autoCleanPencilMarks ? '#3b82f6' : '#e5e7eb',
                     color: autoCleanPencilMarks ? 'white' : '#111827',
@@ -451,9 +416,15 @@ export default function Play() {
                     cursor: 'pointer',
                   }}
                 >
-                  {autoCleanPencilMarks ? '🧹 Auto-Clean Notes: ON' : '🧹 Auto-Clean Notes: OFF'}
+                  {autoCleanPencilMarks ? '🧹 Auto-Clean: ON' : '🧹 Auto-Clean: OFF'}
                 </button>
               </div>
+            </div>
+
+            {/* Number Pad */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-lg">
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>🔢 Numbers</div>
+              <NumberPad />
             </div>
           </div>
         </div>
@@ -481,6 +452,9 @@ export default function Play() {
 
         {/* Feedback Badge (floating) */}
         <FeedbackBadge />
+
+        {/* Hint Display (floating) */}
+        <HintDisplay />
 
         {/* Hidden input for mobile keyboard - only on small screens */}
         <input

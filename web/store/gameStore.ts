@@ -5,7 +5,7 @@
 import { create } from 'zustand'
 import type { SudokuGrid, GridSize, Difficulty, Move } from '@/lib/sudoku/types'
 import { generatePuzzle } from '@/lib/sudoku/generator'
-import { isValidMove, cloneGrid } from '@/lib/sudoku/validator'
+import { isValidMove, cloneGrid, getCandidates } from '@/lib/sudoku/validator'
 import { detectStrategy, type Strategy, type StrategyResult } from '@/lib/sudoku/strategies'
 import { extractFeatures } from '@/lib/ml/features'
 import { mockPredict } from '@/lib/ml/mock'
@@ -53,6 +53,11 @@ export interface GameState {
   showFeedback: boolean
   strategiesUsed: Map<Strategy, number>
 
+  // Hint state
+  hintCell: { row: number; col: number; value: number } | null
+  hintStrategy: StrategyResult | null
+  showHint: boolean
+
   // Actions
   startNewGame: (size: GridSize, difficulty: Difficulty, seed?: number) => void
   selectCell: (row: number, col: number) => void
@@ -65,6 +70,7 @@ export interface GameState {
   removePencilMark: (value: number) => void
   clearPencilMarks: () => void
   useHint: () => void
+  dismissHint: () => void
   resetGame: () => void
   dismissFeedback: () => void
   toggleRowHighlight: () => void
@@ -105,6 +111,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastStrategy: null,
   showFeedback: false,
   strategiesUsed: new Map(),
+  hintCell: null,
+  hintStrategy: null,
+  showHint: false,
 
   // Start a new game
   startNewGame: (size: GridSize, difficulty: Difficulty, seed?: number) => {
@@ -132,6 +141,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastStrategy: null,
       showFeedback: false,
       strategiesUsed: new Map(),
+      hintCell: null,
+      hintStrategy: null,
+      showHint: false,
     })
 
     // Apply highlight preset for the difficulty
@@ -523,38 +535,127 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ pencilMarks: newPencilMarks })
   },
 
-  // Use a hint
+  // Use a hint - show strategy for selected cell or find best next move
   useHint: () => {
-    const { selectedCell, solution, currentGrid } = get()
+    const { solution, currentGrid, gridSize, selectedCell } = get()
 
-    if (!selectedCell || !solution || !currentGrid) {
+    if (!solution || !currentGrid) {
       return
     }
 
-    const { row, col } = selectedCell
-    const correctValue = solution[row][col]
+    let targetCell: { row: number; col: number; value: number } | null = null
 
-    if (correctValue === null) {
-      return
+    // If a cell is selected and empty, use that cell
+    if (selectedCell && currentGrid[selectedCell.row][selectedCell.col] === null) {
+      const correctValue = solution[selectedCell.row][selectedCell.col]
+      if (correctValue !== null) {
+        targetCell = {
+          row: selectedCell.row,
+          col: selectedCell.col,
+          value: correctValue,
+        }
+      }
     }
 
-    // Make the move automatically
-    const newGrid = cloneGrid(currentGrid)
-    newGrid[row][col] = correctValue
+    // Otherwise, find the best next move (cell with fewest candidates)
+    if (!targetCell) {
+      let bestCell: { row: number; col: number; value: number; candidatesCount: number } | null = null
 
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          // Skip filled cells
+          if (currentGrid[row][col] !== null) continue
+
+          const candidates = getCandidates(currentGrid, row, col)
+
+          // If we haven't found a cell yet, or this cell has fewer candidates
+          if (bestCell === null || candidates.length < bestCell.candidatesCount) {
+            const correctValue = solution[row][col]
+            if (correctValue !== null) {
+              bestCell = {
+                row,
+                col,
+                value: correctValue,
+                candidatesCount: candidates.length,
+              }
+
+              // If only one candidate, this is the best we can find
+              if (candidates.length === 1) {
+                break
+              }
+            }
+          }
+        }
+        // Early exit if we found a single candidate
+        if (bestCell && bestCell.candidatesCount === 1) break
+      }
+
+      if (!bestCell) {
+        return
+      }
+
+      targetCell = {
+        row: bestCell.row,
+        col: bestCell.col,
+        value: bestCell.value,
+      }
+    }
+
+    // Detect the strategy for this move
+    const strategy = detectStrategy(currentGrid, targetCell.row, targetCell.col, targetCell.value)
+
+    // Enable all helper lights to assist with the hint (teaching mode)
     set({
-      currentGrid: newGrid,
-      hintsUsed: get().hintsUsed + 1,
+      showRowHighlight: true,
+      showColumnHighlight: true,
+      showBoxHighlight: true,
     })
 
-    // Check completion
-    const isComplete = checkCompletion(newGrid, solution)
-    if (isComplete) {
-      set({
-        isComplete: true,
-        endTime: Date.now(),
-      })
+    // Set the hint to display (don't fill it in automatically - teach, don't solve!)
+    // Note: We store the value internally for validation but HintDisplay won't show it
+    set({
+      hintCell: { row: targetCell.row, col: targetCell.col, value: targetCell.value },
+      hintStrategy: strategy,
+      showHint: true,
+      hintsUsed: get().hintsUsed + 1,
+      selectedCell: { row: targetCell.row, col: targetCell.col },
+    })
+
+    // Highlight the row, column, and box for the hint cell
+    const highlighted = new Set<string>()
+    const boxSize = gridSize === 4 ? 2 : gridSize === 6 ? 2 : 3
+    const boxColSize = gridSize === 6 ? 3 : boxSize
+    const boxRow = Math.floor(targetCell.row / boxSize) * boxSize
+    const boxCol = Math.floor(targetCell.col / boxColSize) * boxColSize
+
+    // Add row cells
+    for (let c = 0; c < gridSize; c++) {
+      highlighted.add(cellKey(targetCell.row, c))
     }
+
+    // Add column cells
+    for (let r = 0; r < gridSize; r++) {
+      highlighted.add(cellKey(r, targetCell.col))
+    }
+
+    // Add box cells
+    for (let r = boxRow; r < boxRow + boxSize; r++) {
+      for (let c = boxCol; c < boxCol + boxColSize; c++) {
+        highlighted.add(cellKey(r, c))
+      }
+    }
+
+    set({ highlightedCells: highlighted })
+  },
+
+  // Dismiss hint
+  dismissHint: () => {
+    set({
+      hintCell: null,
+      hintStrategy: null,
+      showHint: false,
+      highlightedCells: new Set(),
+    })
   },
 
   // Reset to initial state
@@ -582,6 +683,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastStrategy: null,
       showFeedback: false,
       strategiesUsed: new Map(),
+      hintCell: null,
+      hintStrategy: null,
+      showHint: false,
     })
   },
 
