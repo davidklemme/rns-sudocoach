@@ -1,8 +1,16 @@
 {
-  "name": "sudoku-teacher-web",
-  "version": "0.1.0",
-  "description": "Sudoku Teaching App - Web Application",
-  "private": true,
+  "name": "rns-sudocoach",
+  "version": "1.0.0",
+  "description": "RnS SuDoCoach - A visual-learning Sudoku app for kids that teaches through color-coded hints. Built for Ruben and Sammy.",
+  "author": "David Klemme",
+  "license": "MIT",
+  "keywords": ["sudoku", "kids", "learning", "teaching", "puzzle", "nextjs", "react"],
+  "homepage": "https://rns-sudocoach.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davidklemme/rns-sudocoach"
+  },
+  "private": false,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
