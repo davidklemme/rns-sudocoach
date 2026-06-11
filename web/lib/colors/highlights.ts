@@ -48,13 +48,9 @@ export function getHighlightClasses(
     return isSelected ? HIGHLIGHT_STYLES.selected : '';
   }
 
-  const baseClasses = HIGHLIGHT_STYLES[highlight.type];
-
-  // Add animation class if needed
-  const animationClass = highlight.animate ? 'animate-gentle-pulse' : '';
-
-  // Combine classes
-  return `${baseClasses} ${animationClass}`.trim();
+  // Framer Motion in Cell handles the pulse animation via the `animate` prop.
+  // Don't also apply the CSS class — they fight each other.
+  return HIGHLIGHT_STYLES[highlight.type];
 }
 
 /**

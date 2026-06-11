@@ -8,26 +8,21 @@ interface CompletionModalProps {
   elapsedTime: string;
 }
 
-// Confetti particle component
-function ConfettiParticle({ delay, color }: { delay: number; color: string }) {
-  const randomX = Math.random() * 100;
-  const randomRotation = Math.random() * 720 - 360;
+interface ConfettiParticleProps {
+  delay: number;
+  color: string;
+  x: number;
+  rotation: number;
+}
 
+function ConfettiParticle({ delay, color, x, rotation }: ConfettiParticleProps) {
   return (
     <motion.div
       className={`absolute w-3 h-3 ${color} rounded-sm`}
-      style={{ left: `${randomX}%`, top: '-20px' }}
+      style={{ left: `${x}%`, top: '-20px' }}
       initial={{ y: 0, rotate: 0, opacity: 1 }}
-      animate={{
-        y: '100vh',
-        rotate: randomRotation,
-        opacity: [1, 1, 0],
-      }}
-      transition={{
-        duration: 3,
-        delay,
-        ease: 'easeOut',
-      }}
+      animate={{ y: '100vh', rotate: rotation, opacity: [1, 1, 0] }}
+      transition={{ duration: 3, delay, ease: 'easeOut' }}
     />
   );
 }
@@ -46,9 +41,17 @@ export default function CompletionModal({ elapsedTime }: CompletionModalProps) {
   const { isComplete, gridSize, difficulty, startNewGame } = useGameStore();
   const [showConfetti, setShowConfetti] = useState(false);
   const playerName =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('rns-player-name')
-      : null;
+    typeof window !== 'undefined' ? localStorage.getItem('rns-player-name') : null;
+
+  // Generate random values once on mount (client-side only) to avoid SSR mismatch
+  const [confettiData] = useState(() =>
+    Array.from({ length: 50 }).map((_, i) => ({
+      x: Math.random() * 100,
+      rotation: Math.random() * 720 - 360,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      delay: i * 0.05,
+    }))
+  );
 
   useEffect(() => {
     if (isComplete) {
@@ -73,11 +76,13 @@ export default function CompletionModal({ elapsedTime }: CompletionModalProps) {
         {/* Confetti */}
         {showConfetti && (
           <div className="fixed inset-0 overflow-hidden pointer-events-none">
-            {Array.from({ length: 50 }).map((_, i) => (
+            {confettiData.map(({ x, rotation, color, delay }, i) => (
               <ConfettiParticle
                 key={i}
-                delay={i * 0.05}
-                color={CONFETTI_COLORS[i % CONFETTI_COLORS.length]}
+                x={x}
+                rotation={rotation}
+                color={color}
+                delay={delay}
               />
             ))}
           </div>

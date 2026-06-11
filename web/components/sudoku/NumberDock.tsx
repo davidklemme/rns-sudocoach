@@ -28,19 +28,20 @@ export function NumberDock({
   const numbers = Array.from({ length: gridSize }, (_, i) => i + 1);
 
   return (
-    <div
-      className={cn(
-        'grid grid-flow-col grid-rows-2 md:grid-rows-1 gap-3 m-4 p-4 rounded-xl transition-all',
-        isPencilMode && 'ring-2 ring-orange-400 bg-orange-50'
-      )}
-    >
-      {/* Pencil mode indicator */}
+    <div className="flex flex-col items-center gap-1">
+      {/* Pencil mode indicator — outside the grid so it doesn't consume a grid cell */}
       {isPencilMode && (
-        <div className="w-full text-center text-sm text-orange-600 font-medium mb-1">
+        <div className="text-center text-sm text-orange-600 font-medium">
           ✏️ Notes Mode
         </div>
       )}
 
+      <div
+        className={cn(
+          'grid grid-flow-col grid-rows-2 md:grid-rows-1 gap-3 px-4 py-3 rounded-xl transition-all',
+          isPencilMode && 'ring-2 ring-orange-400 bg-orange-50'
+        )}
+      >
       {/* Number buttons */}
       {numbers.map((num) => {
         const isCompleted = completedNumbers.has(num);
@@ -67,6 +68,7 @@ export function NumberDock({
           </motion.button>
         );
       })}
+      </div>
     </div>
   );
 }
