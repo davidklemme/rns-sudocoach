@@ -1,5 +1,11 @@
 import Link from 'next/link';
 
+const SIZES = [
+  { size: 4, emoji: '🌟', label: '4×4', tag: 'Starter', bg: 'bg-green-100', border: 'border-green-200', text: 'text-green-700', sub: 'text-green-600' },
+  { size: 6, emoji: '⭐', label: '6×6', tag: 'Growing', bg: 'bg-yellow-100', border: 'border-yellow-200', text: 'text-yellow-700', sub: 'text-yellow-600' },
+  { size: 9, emoji: '🏆', label: '9×9', tag: 'Champion', bg: 'bg-purple-100', border: 'border-purple-200', text: 'text-purple-700', sub: 'text-purple-600' },
+];
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
@@ -18,22 +24,18 @@ export default function Home() {
           <h2 className="text-2xl font-bold mb-6 text-gray-700">
             Choose Your Challenge
           </h2>
-          <div className="grid grid-cols-3 gap-1 md:gap-4">
-            <div className="bg-green-100 rounded-2xl p-2 md:p-4 border-2 border-green-200">
-              <div className="text-4xl mb-2">🌟</div>
-              <div className="font-bold text-lg text-green-700">4×4</div>
-              <div className="text-sm text-green-600">Starter</div>
-            </div>
-            <div className="bg-yellow-100 rounded-2xl p-2 md:p-4 border-2 border-yellow-200">
-              <div className="text-4xl mb-2">⭐</div>
-              <div className="font-bold text-lg text-yellow-700">6×6</div>
-              <div className="text-sm text-yellow-600">Growing</div>
-            </div>
-            <div className="bg-purple-100 rounded-2xl p-2 md:p-4 border-2 border-purple-200">
-              <div className="text-4xl mb-2">🏆</div>
-              <div className="font-bold text-lg text-purple-700">9×9</div>
-              <div className="text-sm text-purple-600">Champion</div>
-            </div>
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
+            {SIZES.map(({ size, emoji, label, tag, bg, border, text, sub }) => (
+              <Link
+                key={size}
+                href={`/play?size=${size}`}
+                className={`${bg} rounded-2xl p-2 md:p-4 border-2 ${border} hover:scale-105 active:scale-95 transition-transform cursor-pointer`}
+              >
+                <div className="text-4xl mb-2">{emoji}</div>
+                <div className={`font-bold text-lg ${text}`}>{label}</div>
+                <div className={`text-sm ${sub}`}>{tag}</div>
+              </Link>
+            ))}
           </div>
         </div>
 

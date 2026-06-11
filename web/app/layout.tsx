@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Sudoku Teacher - Learn While You Play',
-  description: 'An intelligent Sudoku app that teaches you strategies as you play',
+  title: 'RnS SuDoCoach - Learn Sudoku with Your Coach!',
+  description: 'Color-coded Sudoku learning app for kids. Green means fill me, red means oops!',
 }
 
 export default function RootLayout({

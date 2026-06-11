@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { Suspense, useEffect, useState, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useGameStore } from '@/store/gameStore';
 
-// New components
 import { GameShell } from '@/components/layout/GameShell';
 import { Header } from '@/components/layout/Header';
 import { Grid } from '@/components/sudoku/Grid';
@@ -11,25 +11,29 @@ import { NumberDock } from '@/components/sudoku/NumberDock';
 import { ActionBar } from '@/components/sudoku/ActionBar';
 import { CoachZone } from '@/components/coach/CoachZone';
 import { PlayerSelect } from '@/components/coach/PlayerSelect';
-
-// Keep existing modals for now
 import CompletionModal from '@/components/game/CompletionModal';
 
-// Color system
 import { CellHighlights, posKey } from '@/lib/colors/highlights';
 import { findConflicts, createConflictHighlights, createHighlightsForHint, StrategyHintResult } from '@/lib/colors/strategy-highlights';
 import { GridSize, Difficulty } from '@/lib/sudoku/types';
 
-/**
- * RnS SuDoCoach - Main Game Page
- *
- * Single-screen Sudoku learning experience with:
- * - Visual color-coded teaching
- * - Always-visible Coach
- * - Personalized for Ruben, Sammy, and others
- */
-export default function Play() {
-  // Game state from store
+export default function PlayPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      }
+    >
+      <Play />
+    </Suspense>
+  );
+}
+
+function Play() {
+  const searchParams = useSearchParams();
+
   const {
     currentGrid,
     initialGrid,
@@ -55,33 +59,34 @@ export default function Play() {
     hintCell,
     hintStrategy,
     dismissHint,
+    highlightedCells,
   } = useGameStore();
 
-  // Local UI state
   const [elapsedTime, setElapsedTime] = useState('0:00');
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [showPlayerSelect, setShowPlayerSelect] = useState(false);
   const [coachMessage, setCoachMessage] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<CellHighlights>(new Map());
 
-  // Check localStorage for player name on mount
+  // Persist player selection — empty string means "skipped"
   useEffect(() => {
     const savedName = localStorage.getItem('rns-player-name');
-    if (savedName) {
-      setPlayerName(savedName);
+    if (savedName !== null) {
+      setPlayerName(savedName || null);
     } else {
       setShowPlayerSelect(true);
     }
   }, []);
 
-  // Start a new game if none exists
   useEffect(() => {
     if (!currentGrid) {
-      startNewGame(4, 'beginner', Date.now()); // Start with 4x4 for kids
+      const sizeParam = searchParams.get('size');
+      const size = sizeParam === '6' ? 6 : sizeParam === '9' ? 9 : 4;
+      const diff = size === 9 ? 'medium' : size === 6 ? 'easy' : 'beginner';
+      startNewGame(size as GridSize, diff, Date.now());
     }
-  }, [currentGrid, startNewGame]);
+  }, [currentGrid, startNewGame, searchParams]);
 
-  // Update timer every second
   useEffect(() => {
     if (!startTime || isComplete) return;
 
@@ -98,7 +103,6 @@ export default function Play() {
     return () => clearInterval(interval);
   }, [startTime, endTime, isComplete]);
 
-  // Generate hint message based on strategy
   const getHintMessage = useCallback(() => {
     const name = playerName || '';
     const prefix = name ? `${name}, ` : '';
@@ -123,66 +127,62 @@ export default function Play() {
       default:
         return `${prefix}Look at the green cell! Check which numbers are already in its row, column, and box.`;
     }
-  }, [playerName, hintStrategy, hintCell]);
+  }, [playerName, hintStrategy]);
 
-  // Update highlights when hint or conflicts change
+  // Build the full highlights map: selection < hints < conflicts
   useEffect(() => {
     if (!currentGrid) return;
 
-    let newHighlights: CellHighlights = new Map();
+    const newHighlights: CellHighlights = new Map();
 
-    // Add hint highlights if active - use strategy-based highlighting
+    // Layer 1: row/col/box selection highlights (lowest priority)
+    // highlightedCells uses "row,col" keys; posKey uses "row-col"
+    highlightedCells.forEach((key) => {
+      const [row, col] = key.split(',').map(Number);
+      newHighlights.set(`${row}-${col}`, { type: 'focus', intensity: 'subtle' });
+    });
+
+    // Layer 2: hint highlights override selection
     if (hintCell && hintStrategy) {
-      // Build the hint result for the highlight system
       const hintResult: StrategyHintResult = {
         type: hintStrategy.strategy,
         targetCell: { row: hintCell.row, col: hintCell.col },
         targetValue: hintCell.value,
         relatedCells: hintStrategy.affectedCells,
       };
-
-      // Create strategy-specific highlights (green target + blue/purple related cells)
-      newHighlights = createHighlightsForHint(hintResult, gridSize);
-
-      // Update coach message with strategy-based hint
+      const hintHighlights = createHighlightsForHint(hintResult, gridSize);
+      hintHighlights.forEach((h, k) => newHighlights.set(k, h));
       setCoachMessage(getHintMessage());
     } else if (hintCell) {
-      // Fallback: just green highlight if no strategy info
       newHighlights.set(posKey({ row: hintCell.row, col: hintCell.col }), {
         type: 'solvable',
         animate: true,
       });
       setCoachMessage(getHintMessage());
-    } else if (hintStrategy && hintStrategy.strategy === 'advanced') {
-      // No solvable cell found - show message but no highlights
+    } else if (hintStrategy?.strategy === 'advanced') {
       setCoachMessage(getHintMessage());
     }
 
-    // Add conflict highlights
+    // Layer 3: conflict highlights (highest priority)
     const conflicts = findConflicts(currentGrid, gridSize);
     if (conflicts.length > 0) {
       const conflictHighlights = createConflictHighlights(conflicts);
-      conflictHighlights.forEach((highlight, key) => {
-        newHighlights.set(key, highlight);
-      });
-
-      // Update coach message about conflict
-      const conflictMessage = playerName
-        ? `Oops ${playerName}, there's a duplicate! Look at the red cells.`
-        : 'Oops, there\'s a duplicate! Look at the red cells.';
-      setCoachMessage(conflictMessage);
-    } else if (!hintCell && (!hintStrategy || hintStrategy.strategy !== 'advanced')) {
-      // Clear message if no hints or conflicts (unless advanced strategy message)
+      conflictHighlights.forEach((h, k) => newHighlights.set(k, h));
+      setCoachMessage(
+        playerName
+          ? `Oops ${playerName}, there's a duplicate! Look at the red cells.`
+          : "Oops, there's a duplicate! Look at the red cells."
+      );
+    } else if (!hintCell && hintStrategy?.strategy !== 'advanced') {
       setCoachMessage(null);
     }
 
     setHighlights(newHighlights);
-  }, [currentGrid, hintCell, hintStrategy, gridSize, playerName, getHintMessage]);
+  }, [currentGrid, hintCell, hintStrategy, gridSize, playerName, highlightedCells, getHintMessage]);
 
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Number keys 1-9
       const digitMatch = e.code.match(/^Digit(\d)$/);
       if (digitMatch) {
         const num = parseInt(digitMatch[1]);
@@ -196,14 +196,12 @@ export default function Play() {
         return;
       }
 
-      // Backspace/Delete to clear
       if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
         clearCell();
         return;
       }
 
-      // Arrow keys for navigation
       if (!selectedCell || !currentGrid) return;
 
       let newRow = selectedCell.row;
@@ -239,12 +237,27 @@ export default function Play() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedCell, currentGrid, gridSize, makeMove, selectCell, clearCell, addPencilMark]);
 
-  // Handlers
+  // Compute which numbers are fully placed (appear gridSize times)
+  const completedNumbers = useMemo(() => {
+    if (!currentGrid) return new Set<number>();
+    const counts = new Map<number, number>();
+    currentGrid.forEach((row) =>
+      row.forEach((cell) => {
+        if (cell !== null && cell !== 0) {
+          counts.set(cell, (counts.get(cell) ?? 0) + 1);
+        }
+      })
+    );
+    const completed = new Set<number>();
+    counts.forEach((count, num) => {
+      if (count === gridSize) completed.add(num);
+    });
+    return completed;
+  }, [currentGrid, gridSize]);
+
   const handlePlayerSelect = useCallback((name: string) => {
-    if (name) {
-      localStorage.setItem('rns-player-name', name);
-      setPlayerName(name);
-    }
+    localStorage.setItem('rns-player-name', name); // '' persists skip
+    setPlayerName(name || null);
     setShowPlayerSelect(false);
   }, []);
 
@@ -284,13 +297,10 @@ export default function Play() {
     setHighlights(new Map());
     startNewGame(gridSize, difficulty, Date.now());
     setCoachMessage(
-      playerName
-        ? `New puzzle, ${playerName}! Let's do this!`
-        : "New puzzle! Let's do this!"
+      playerName ? `New puzzle, ${playerName}! Let's do this!` : "New puzzle! Let's do this!"
     );
   }, [gridSize, difficulty, startNewGame, playerName, dismissHint]);
 
-  // Render
   if (!currentGrid || !initialGrid) {
     return (
       <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -324,18 +334,14 @@ export default function Play() {
             onCellClick={selectCell}
           />
         }
-        coach={
-          <CoachZone
-            playerName={playerName}
-            message={coachMessage}
-          />
-        }
+        coach={<CoachZone playerName={playerName} message={coachMessage} />}
         controls={
           <div className="space-y-3">
             <NumberDock
               gridSize={gridSize}
               onNumberClick={handleNumberClick}
               isPencilMode={isPencilMode}
+              completedNumbers={completedNumbers}
             />
             <ActionBar
               canUndo={historyIndex >= 0}
@@ -352,10 +358,7 @@ export default function Play() {
         }
       />
 
-      {/* Player selection modal */}
       {showPlayerSelect && <PlayerSelect onSelect={handlePlayerSelect} />}
-
-      {/* Completion modal */}
       <CompletionModal elapsedTime={elapsedTime} />
     </>
   );
